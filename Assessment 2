@@ -1,0 +1,185 @@
+typedef unsigned char u8;
+
+
+// LCD module connections
+sbit LCD_RS at RE2_bit;
+sbit LCD_EN at RE1_bit;
+sbit LCD_D0 at RD0_bit;
+sbit LCD_D1 at RD1_bit;
+sbit LCD_D2 at RD2_bit;
+sbit LCD_D3 at RD3_bit;
+sbit LCD_D4 at RD4_bit;
+sbit LCD_D5 at RD5_bit;
+sbit LCD_D6 at RD6_bit;
+sbit LCD_D7 at RD7_bit;
+
+sbit LCD_RS_Direction at TRISE2_bit;
+sbit LCD_EN_Direction at TRISE1_bit;
+sbit LCD_D0_Direction at TRISD0_bit;
+sbit LCD_D1_Direction at TRISD1_bit;
+sbit LCD_D2_Direction at TRISD2_bit;
+sbit LCD_D3_Direction at TRISD3_bit;
+sbit LCD_D4_Direction at TRISD4_bit;
+sbit LCD_D5_Direction at TRISD5_bit;
+sbit LCD_D6_Direction at TRISD6_bit;
+sbit LCD_D7_Direction at TRISD7_bit;
+// End LCD module connections
+
+u8 High_Temp_Limit = 45; //Variable through which the maximum temperature limit is set
+u8 Low_Temp_Limit = 35; //Variable through which the minimum temperature limit is set
+
+//Start Of Functions prototype
+void InitLCD();
+void InitAdc();
+void InitHeater();
+void InitThresholds();
+void InitSystem();
+void Buzzer(float temp);
+void DisplayCurrentTemp(float temp_in_celsius);
+void SetTempLimits();
+float CurrentTemp();
+//End Of Functions Prototype
+
+//Program Entry Point
+void main()
+{
+        InitSystem(); //Calling Function InitSystem();
+
+        while(1)
+        {
+                float temp_measure=CurrentTemp(); //Variable creation through which the current temperature is saved
+                DisplayCurrentTemp(temp_measure); //Function call for displaying the current measured temperature in variable temp_measure
+                SetTempLimits(); //Function call for setting the temperature max & min limits through push buttons or keypad
+                Buzzer(temp_measure); // Function call for the buzzer to be on or off based on the measured temperature
+                Delay_ms(200); //Waiting 200 milliseconds
+        }
+
+}
+
+void InitLCD()
+{
+        ANSELD=0;
+        TRISD=0;
+        PORTD=0;
+        TRISE=0;
+        PORTE=0;
+        ANSELE=0;
+
+        Lcd_Init();
+        Lcd_Cmd(_LCD_CLEAR);
+        Lcd_Cmd(_LCD_CURSOR_OFF);
+
+        Lcd_Out(1,1,"Embedded systems");
+    Delay_ms(1000);
+        Lcd_Out(2,3,"Assesment 2");
+    Delay_ms(1000);
+        Lcd_Out(3,-1,"Human Machine");
+        Delay_ms(1000);
+        Lcd_Out(4,0,"Interface");
+
+        Delay_ms(5000);
+        
+        Lcd_Cmd(_LCD_CLEAR);
+}
+
+void InitAdc()
+{
+        ANSELA=0xFF; //Setting PORTA pins as analog pins
+        TRISA-0xFF; //Setting PORTA direction to be input
+        ADC_Init(); //Function call to set the initial conditions for the analog to digital converter
+}
+
+void InitHeater()
+{
+        ANSELC=0; //Setting PORTC pins as digital pins
+        TRISC=0; //Setting PORTC direction to be output
+        RC5_bit=1; // Setting RC5_bit by 1 "Heater Related"
+}
+
+void InitThresholds()
+{
+        ANSELB=0;         //Setting PORTB pins as digital pins
+        TRISB=0xff; //Setting PORTB direction to be input
+}
+
+void InitSystem()
+{
+        InitHeater(); //Function call for setting the initial parameters for the Heater
+        InitLCD(); //Function call for setting the initial parameters for the LCD
+        InitAdc(); //Function call for setting the initial parameters for the Analog to Digital converter
+        InitThresholds(); //Setting PORTB pins as digital pins & Setting PORTB direction to be input
+}
+
+void Buzzer(float temp)
+{
+        if ( (char)temp >= High_Temp_Limit ) //Checking if the current temperature is greater than the max temperature limit
+        {
+                //Set the buzzer on
+                RC1_bit=1;
+                RC2_bit=1;
+        }
+        else
+        {
+                //Set the buzzer off
+                RC1_bit=0;
+                RC2_bit=0;
+        }
+}
+
+//Function for returning the temperature in celsius
+float CurrentTemp()
+{
+        int adc_of_temp; //Variable creation
+        float temp_in_celsius; //Variable creation for calculating the temperature from Fehren
+        adc_of_temp = ADC_Read(2);
+        temp_in_celsius = 5*adc_of_temp/10.24;
+        return temp_in_celsius; //Returning the temperature in celsius through another variable
+}
+
+//Function for Displaying the currently measured temperature
+void DisplayCurrentTemp(float temp_in_celsius)
+{
+        char temp_in_string[10]; //Creating a character array of 10 elements
+        WordToStr(temp_in_celsius, temp_in_string); //Converting the temperature to a string to be presented on the LCD
+        Lcd_Out(1,5,temp_in_string); //Printing the currently measured temperature
+}
+
+//Setting The Maximum & Minimum Limits For The Temperature Through The Push Buttons On The Keypad
+void  SetTempLimits()
+{
+        char High_Temp_LimStr[2]; //Creating character array of 2 elements to receive the new number for max temp limit after being incremented or decremented
+        char Low_Temp_LimStr[2]; //Creating character array of 2 elements to receive the new number for min temp limit after being incremented or decremented
+
+        //decrementing the maximum temperature limit when RB3 is pressed        
+        if (RB3_bit==1)
+        {
+                High_Temp_Limit --;
+        }
+        
+        //incrementing the maximum temperature limit when RB4 is pressed
+        if (RB4_bit==1)
+        {
+                High_Temp_Limit++;
+        }
+        
+        //incrementing the minimum temperature limit when RB0 is pressed
+        if(RB0_bit==1)
+        {
+                Low_Temp_Limit++;
+        }
+        
+        //decrementing the minimum temperature limit when RB0 is pressed
+        if(RB1_bit==1)
+        {
+                Low_Temp_Limit--;
+        }
+
+        ShortToStr(High_Temp_Limit,High_Temp_LimStr); //Converting the temperature to a string to be presented on the LCD
+        Lcd_Out(2,1,"HL:"); // Printing "HL" referring to High Temp Limit on LCD in row 2 column 1
+        Lcd_Out(2,4,High_Temp_LimStr); // Printing the new temp limit on LCD in row 2 column 4
+
+
+        ShortToStr(Low_Temp_Limit,Low_Temp_LimStr); //Converting the temperature to a string to be presented on the LCD
+        Lcd_Out(2,9,"LL:"); // Printing "LL" referring to Low Temp Limit on LCD in row 2 column 9
+        Lcd_Out(2,13,Low_Temp_LimStr); // Printing the new temp limit on LCD in row 2 column 13
+}
